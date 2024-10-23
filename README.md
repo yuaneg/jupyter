@@ -24,3 +24,9 @@ chat_template = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 ```
 docker run --gpus all -d -it animcogn/face_recognition:gpu-nightly bash
 
+
+docker run -d --gpus=all -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
+
+docker exec -it ollama ollama run llama3
+
+
