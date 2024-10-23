@@ -22,5 +22,5 @@ chat_template = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 {OUTPUT}<|eot_id|>"""
 
 ```
-
+docker run --gpus all -d -it animcogn/face_recognition:gpu-nightly bash
 
