@@ -31,4 +31,6 @@ docker run -d --gpus=all -v ollama:/root/.ollama -p 11434:11434 --name ollama ol
 docker exec -it ollama ollama run llama3
 https://colab.research.google.com/github/yuaneg/jupyter/blob/main/train.ipynb#scrollTo=R2xTzPzWYNAk
 
+xformers = '0.0.28.post3'
+docker run --gpus all -d -it -p 8888:8888  -e GRANT_SUDO=yes -e JUPYTER_ENABLE_LAB=yes --user root -v /f/jovyan:/home/jovyan --name jupyter quay.io/jupyter/pytorch-notebook:cuda12-pytorch-2.5.1
 ```
