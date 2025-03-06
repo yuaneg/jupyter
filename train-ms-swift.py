@@ -1,6 +1,7 @@
 # import some libraries
 import os
 from builtins import print
+import shutil
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
 
@@ -12,11 +13,18 @@ from functools import partial
 
 logger = get_logger()
 seed_everything(42)
+
+# 删除 /root/tuning 目录
+shutil.rmtree("/root/tuning", ignore_errors=True)
+
+# 设置环境变量
+os.environ["NCCL_P2P_DISABLE"] = "1"
+os.environ["NCCL_IB_DISABLE"] = "1"
 # Hyperparameters for training
 # model
-model_id_or_path = 'Qwen/Qwen2.5-0.5B-Instruct'  # model_id or model_path
+model_id_or_path = '/root/model/qwen2.5-7b-instruct'  # model_id or model_path
 system = 'You are a helpful assistant.'
-output_dir = 'output'
+output_dir = '/root/tuning/output/abc'
 max_length = 2048
 
 # 获取模型信息
@@ -27,19 +35,21 @@ template = get_template(model.model_meta.template, tokenizer, default_system=sys
 template.set_mode('train')
 logger.info("---------------获取模型初始化结束---------------")
 
-
 # 加载数据集
 # dataset
-dataset = ['AI-ModelScope/alpaca-gpt4-data-zh#10000',
-           'AI-ModelScope/alpaca-gpt4-data-en#10000',
-           'swift/self-cognition#10000']  # dataset_id or dataset_path
+dataset = ['AI-ModelScope/alpaca-gpt4-data-zh#5000',
+           'AI-ModelScope/alpaca-gpt4-data-en#5000',
+           'swift/self-cognition#5000',
+           '/root/sharegpt_jsonl/5000train.jsonl'
+           ]
 data_seed = 42
 split_dataset_ratio = 0.01
 num_proc = 4  # The number of processes for data loading.
 model_name = ['中企动力', 'zhongqidongli']
 model_author = ['中企动力', 'zhongqidongli']
 train_dataset, val_dataset = load_dataset(dataset, split_dataset_ratio=split_dataset_ratio, num_proc=num_proc,
-                                          model_name=model_name, model_author=model_author, seed=data_seed)
+                                          model_name=model_name, model_author=model_author, seed=data_seed,
+                                          columns={"input": "query", "output": "solution"})
 
 logger.info(f'train_dataset: {train_dataset}')
 logger.info(f'val_dataset: {val_dataset}')
@@ -55,7 +65,7 @@ output_dir = os.path.abspath(os.path.expanduser(output_dir))
 logger.info(f'output_dir: {output_dir}')
 training_args = Seq2SeqTrainingArguments(
     output_dir=output_dir,
-    learning_rate=1e-4,
+    learning_rate=2e-4,
     per_device_train_batch_size=1,
     per_device_eval_batch_size=1,
     gradient_checkpointing=True,
