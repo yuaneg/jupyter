@@ -3,26 +3,29 @@ import os
 from builtins import print
 import shutil
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'
-
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+import argparse
+## 启动训练，自动加载最近的 checkpoint（如果存在）
+from pathlib import Path
 from swift.llm import get_model_tokenizer, load_dataset, get_template, EncodePreprocessor
 from swift.utils import get_logger, find_all_linears, get_model_parameter_info, plot_images, seed_everything
 from swift.tuners import Swift, LoraConfig
 from swift.trainers import Seq2SeqTrainer, Seq2SeqTrainingArguments
 from functools import partial
-
 logger = get_logger()
 seed_everything(42)
 
-# 删除 /root/tuning 目录
-shutil.rmtree("/root/tuning", ignore_errors=True)
+# 解析启动参数
+parser = argparse.ArgumentParser()
+parser.add_argument("--mode", choices=["train", "continue"], required=True, help="train: 从头训练, continue: 继续训练")
+args = parser.parse_args()
 
 # 设置环境变量
 os.environ["NCCL_P2P_DISABLE"] = "1"
 os.environ["NCCL_IB_DISABLE"] = "1"
 # Hyperparameters for training
 # model
-model_id_or_path = '/root/model/qwen2.5-7b-instruct'  # model_id or model_path
+model_id_or_path = '/root/Qwen2.5-0.5B-Instruct'  # model_id or model_path
 system = 'You are a helpful assistant.'
 output_dir = '/root/tuning/output/abc'
 max_length = 2048
@@ -37,10 +40,10 @@ logger.info("---------------获取模型初始化结束---------------")
 
 # 加载数据集
 # dataset
-dataset = ['AI-ModelScope/alpaca-gpt4-data-zh#5000',
-           'AI-ModelScope/alpaca-gpt4-data-en#5000',
-           'swift/self-cognition#5000',
-           '/root/sharegpt_jsonl/5000train.jsonl'
+dataset = ['AI-ModelScope/alpaca-gpt4-data-zh#500',
+           'AI-ModelScope/alpaca-gpt4-data-en#500',
+           'swift/self-cognition#500',
+           '/root/db.jsonl'
            ]
 data_seed = 42
 split_dataset_ratio = 0.01
@@ -79,7 +82,7 @@ training_args = Seq2SeqTrainingArguments(
     eval_strategy='steps',
     eval_steps=50,
     gradient_accumulation_steps=16,
-    num_train_epochs=1,
+    num_train_epochs=50,
     metric_for_best_model='loss',
     save_total_limit=5,
     logging_steps=5,
@@ -115,7 +118,28 @@ model_parameter_info = get_model_parameter_info(model)
 logger.info(f'model_parameter_info: {model_parameter_info}')
 
 ##启动训练
-trainer.train()
+# 处理 continue 模式，查找最近的 checkpoint
+last_checkpoint = None
+if args.mode == "continue":
+    output_dir = Path(output_dir)
+    if output_dir.exists():
+        checkpoints = sorted(output_dir.glob("checkpoint-*"), key=lambda x: int(x.name.split("-")[-1]))
+        if checkpoints:
+            last_checkpoint = str(checkpoints[-1])
+            logger.info(f"发现最新的 checkpoint: {last_checkpoint}")
+# 启动训练
+if args.mode == "train":
+    # 删除 /root/tuning 目录
+    shutil.rmtree("/root/tuning", ignore_errors=True)
+    logger.info("从头开始训练...")
+    trainer.train()
+elif args.mode == "continue":
+    if last_checkpoint:
+        logger.info(f"从 {last_checkpoint} 继续训练...")
+        trainer.train(resume_from_checkpoint=last_checkpoint)
+    else:
+        logger.info("未找到 checkpoint，从头开始训练...")
+        trainer.train()
 
 last_model_checkpoint = trainer.state.last_model_checkpoint
 logger.info(f'last_model_checkpoint: {last_model_checkpoint}')
